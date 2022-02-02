@@ -1,4 +1,5 @@
 import apache_beam as beam
+import re
 from apache_beam.io import ReadFromText
 from apache_beam.options.pipeline_options import PipelineOptions
 
@@ -53,7 +54,10 @@ def casos_dengue(elemtento):
     """
     uf, registros = elemtento
     for  registro in registros:
-        yield (f"{uf}-{registro['ano_mes']}", registro['casos'])
+        # if bool(re.search(r'\d', registro['casos'])):
+        yield (f"{uf}-{registro['ano_mes']}", float(registro['casos'] or 0.0 ))
+        # else:
+        #     float(registro['casos'] )
 
 dengue = (
     pipeline
@@ -65,6 +69,7 @@ dengue = (
     | "Criar chave pelo estado" >> beam.Map(chave_uf)
     | "Agrupar pelo estado" >> beam.GroupByKey()
     | "Descompactar casos de dengue" >> beam.FlatMap(casos_dengue)
+    | "Soma dos casos pela chave" >> beam.CombinePerKey(sum)
     | "Mostrar resultados" >> beam.Map(print)
 )
 
