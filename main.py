@@ -1,7 +1,6 @@
 import apache_beam as beam
-import numpy
-import re
 from apache_beam.io import ReadFromText
+from apache_beam.io.textio import WriteToText
 from apache_beam.options.pipeline_options import PipelineOptions
 
 pipeline_options = PipelineOptions(argv=None)
@@ -100,12 +99,19 @@ def descompactar_elementos(elemento):
     chuva = dados['chuvas'][0]
     dengue = dados['dengue'][0]
     uf, ano, mes = chave.split('-')
-    return uf, int(ano), int(mes), chuva,dengue
+    return uf, ano, mes, str(chuva), str(dengue)
+
+def preparar_csv(elemento, delimitador=';'):
+    '''
+    Receber uma tupla 
+    Retorna uma string delimitada
+    '''
+    return f"{delimitador}".join(elemento)
 
 dengue = (
     pipeline
     | "Leitura do dataset de dengue" >>
-        ReadFromText('sample_casos_dengue.txt', skip_header_lines=1)
+        ReadFromText('casos_dengue.txt', skip_header_lines=1)
     | "De texto para lista" >> beam.Map(texto_para_lista)
     | "De lista para dicionário" >> beam.Map(lista_para_dicionario, colunas_dengue)
     | "Criar campo ano_mes" >> beam.Map(trata_datas)
@@ -119,7 +125,7 @@ dengue = (
 chuvas = (
     pipeline
     | "Leitura do dataset de chuvas" >>
-        ReadFromText('sample_chuvas.csv', skip_header_lines=1)
+        ReadFromText('chuvas.csv', skip_header_lines=1)
     | "De csv para lista(chuvas)" >> beam.Map(texto_para_lista, delimitador=',')
     | "Criando a chave UF-ANO-MES" >> beam.Map(chave_uf_ano_mes_de_lista)
     | "Soma dos casos pela chave chuva" >> beam.CombinePerKey(sum)
@@ -132,7 +138,12 @@ resultado =(
     | "Mesclar pcols" >> beam.CoGroupByKey()
     | 'Filtra dados vazios' >> beam.Filter(filtra_campos_vazios)
     | 'Descompactar Elementos' >> beam.Map(descompactar_elementos)
-    | "Mostrar resultados da uniao" >> beam.Map(print)
+    | 'Preparar CSV'>> beam.Map(preparar_csv)
+    #| "Mostrar resultados da uniao" >> beam.Map(print)
 )
+
+header = 'UF;ANO;MES;CHUVA;DENGUE'
+
+resultado | 'Criar arquivo CSV' >> WriteToText('resultado', file_name_suffix='csv', header=header)
 
 pipeline.run()
