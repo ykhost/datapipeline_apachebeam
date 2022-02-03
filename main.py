@@ -90,6 +90,18 @@ def filtra_campos_vazios(elemento):
     chave, dados = elemento
     if all([dados['chuvas'],dados['dengue']]): return True
     else: return False
+
+def descompactar_elementos(elemento):
+    '''
+    Receber uma tupla 
+    Retorna uma tupla descompactada
+    '''
+    chave, dados = elemento
+    chuva = dados['chuvas'][0]
+    dengue = dados['dengue'][0]
+    uf, ano, mes = chave.split('-')
+    return uf, int(ano), int(mes), chuva,dengue
+
 dengue = (
     pipeline
     | "Leitura do dataset de dengue" >>
@@ -119,6 +131,7 @@ resultado =(
     ({'chuvas':chuvas,'dengue':dengue})
     | "Mesclar pcols" >> beam.CoGroupByKey()
     | 'Filtra dados vazios' >> beam.Filter(filtra_campos_vazios)
+    | 'Descompactar Elementos' >> beam.Map(descompactar_elementos)
     | "Mostrar resultados da uniao" >> beam.Map(print)
 )
 
